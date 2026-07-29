@@ -1,179 +1,134 @@
-# 4-Input Round Robin Arbiter (Verilog)
+# Round Robin Arbiter (4-Input) | Verilog HDL
 
-## Overview
-
-This project implements a **4-input Round Robin Arbiter** in Verilog HDL. The arbiter grants access to one requester at a time while ensuring fairness by rotating the priority after every successful grant. This prevents starvation and guarantees that all requesters eventually receive service.
-
-The design is suitable for FPGA and ASIC digital systems where multiple masters compete for a shared resource such as a bus, memory, or peripheral.
-
----
+A synthesizable **4-input Round Robin Arbiter** implemented in **Verilog HDL**. The design ensures **fair access** among multiple requesters by rotating the priority after every successful grant, preventing starvation commonly found in fixed-priority arbiters.
 
 ## Features
 
-- 4 request inputs
-- Single grant output
+- 4 request inputs (`req[3:0]`)
+- One-hot grant output (`grant[3:0]`)
 - Fair Round Robin arbitration
 - Rotating priority pointer
-- Starvation-free scheduling
-- Synchronous RTL implementation
-- Synthesizable Verilog design
+- Asynchronous active-high reset
+- Fully synthesizable RTL
+- Suitable for FPGA and ASIC implementations
 
 ---
 
-## Specifications
-
-| Parameter | Value |
-|-----------|-------|
-| Number of Requesters | 4 |
-| Arbitration Policy | Round Robin |
-| Clock Domains | 1 |
-| Grant Type | One-Hot |
-| Fairness | Starvation-Free |
-
----
-
-## Block Diagram
+## Architecture
 
 ```
-             +-------------------------+
-req[3:0] --->|                         |
-             |   Round Robin Arbiter   |-----> grant[3:0]
- clk ------->|                         |
- rst ------->|                         |
-             +-------------------------+
-                     |
-                     |
-                Priority Pointer
+                +------------------+
+Request[3:0] -->|                  |
+                | Search Logic     |
+                | (Round Robin)    |
+                |                  |
+                +---------+--------+
+                          |
+                          v
+                  +---------------+
+                  | Grant Logic   |
+                  +-------+-------+
+                          |
+                    Grant[3:0]
+                          ^
+                          |
+                  +-------+-------+
+                  | Priority      |
+                  | Pointer       |
+                  +---------------+
 ```
+
+The arbiter maintains a **2-bit pointer** that stores the highest-priority requester. During each clock cycle, the search begins from the current pointer position and scans all request lines in a circular fashion. The first active request receives the grant, and the pointer advances to the next requester, ensuring fair allocation.
 
 ---
 
 ## Working Principle
 
-The arbiter continuously monitors all request lines.
+On every rising edge of the clock:
 
-When one or more requests are active:
-
-1. Arbitration begins from the current priority pointer.
-2. Requesters are checked in circular order.
-3. The first active requester receives the grant.
-4. The priority pointer moves to the next requester.
-5. Arbitration repeats in the next clock cycle.
-
-This rotation ensures that no requester can permanently block others.
+1. Clear the previous grant.
+2. Start searching from the current priority pointer.
+3. Check all four request lines sequentially.
+4. Grant the first active request encountered.
+5. Update the pointer to the requester immediately after the granted requester.
+6. If no requests are active, no grant is issued and the pointer remains unchanged.
 
 ---
 
-## Priority Rotation Example
+## Example
 
-Assume all requesters continuously request access.
+| Clock Cycle | Requests | Pointer | Grant | Next Pointer |
+|-------------|----------|---------|-------|--------------|
+| 1 | 1111 | 0 | 0001 | 1 |
+| 2 | 1111 | 1 | 0010 | 2 |
+| 3 | 1111 | 2 | 0100 | 3 |
+| 4 | 1111 | 3 | 1000 | 0 |
 
-| Clock Cycle | Priority Starts At | Granted | Next Priority |
-|-------------|-------------------|----------|---------------|
-| 1 | 0 | Request 0 | 1 |
-| 2 | 1 | Request 1 | 2 |
-| 3 | 2 | Request 2 | 3 |
-| 4 | 3 | Request 3 | 0 |
-| 5 | 0 | Request 0 | 1 |
-
-Grant order:
-
-```
-0 → 1 → 2 → 3 → 0 → ...
-```
+This rotation guarantees that every requester eventually receives service.
 
 ---
 
-## Arbitration Example
+## Module Interface
 
-Requests
-
-```
-req = 1011
-```
-
-which means
-
-```
-Requester 3 : Active
-Requester 2 : Inactive
-Requester 1 : Active
-Requester 0 : Active
+```verilog
+module round_robin_arbiter (
+    input              clk,
+    input              rst,
+    input      [3:0]   req,
+    output reg [3:0]   grant
+);
 ```
 
-If the priority pointer is **2**, the search order becomes
+### Inputs
 
-```
-2 → 3 → 0 → 1
-```
+| Signal | Width | Description |
+|--------|------:|-------------|
+| `clk` | 1 | System clock |
+| `rst` | 1 | Asynchronous active-high reset |
+| `req` | 4 | Request inputs |
 
-Since requester **3** is the first active request encountered,
+### Outputs
 
-```
-grant = 1000
-```
-
-The priority pointer is then updated to **0**.
-
----
-
-## Project Structure
-
-```
-.
-├── arbiter.v          # RTL implementation
-├── arbiter_tb.v       # Testbench
-├── README.md
-```
-
----
-
-## Simulation
-
-Example using ModelSim
-
-```bash
-vlog arbiter.v arbiter_tb.v
-vsim arbiter_tb
-run -all
-```
-
-Example using Vivado Simulator
-
-```bash
-xvlog arbiter.v arbiter_tb.v
-xelab arbiter_tb
-xsim arbiter_tb
-```
+| Signal | Width | Description |
+|--------|------:|-------------|
+| `grant` | 4 | One-hot grant output |
 
 ---
 
 ## Applications
 
-- AMBA AXI Bus Arbitration
-- AHB Bus Arbitration
-- NoC Routers
+- Bus Arbitration
 - Shared Memory Controllers
+- AXI/AHB Bus Masters
+- Network-on-Chip (NoC)
 - DMA Controllers
-- Multi-Core Processor Interconnects
-- Cache Controllers
-- Resource Scheduling in FPGA/ASIC Designs
+- Multi-Core Resource Sharing
+- Communication Interfaces
+
+---
+
+## Advantages
+
+- Fair resource allocation
+- Prevents starvation
+- Simple hardware implementation
+- Low area overhead
+- Easy to extend for larger arbiters
 
 ---
 
 ## Future Improvements
 
 - Parameterizable number of requesters
-- Locked transactions
 - Weighted Round Robin arbitration
-- Dynamic priority selection
-- Parking support
-- Grant valid signal
-- Timeout and starvation monitoring
-- SystemVerilog assertions for verification
+- Lock/Hold support
+- Dynamic priority updates
+- Pipelined implementation for high-speed designs
 
 ---
 
 ## Author
 
-Developed as part of RTL Design and Digital System Design practice using Verilog HDL.
+**Adit Varia**
+
+If you found this project useful, consider giving it a ⭐ on GitHub.
