@@ -1,0 +1,48 @@
+module round_robin_arbiter (
+    input              clk,
+    input              rst,
+    input      [3:0]   req,
+    output reg [3:0]   grant
+);
+
+reg [1:0] pointer;
+
+integer i;
+integer idx;
+reg found;
+
+always @(posedge clk or posedge rst) begin
+    if (rst) begin
+        pointer <= 2'd0;
+        grant   <= 4'b0000;
+    end
+    else begin
+
+        // Default: no grant
+        grant = 4'b0000;
+        found = 1'b0;
+
+        // Search from pointer
+        for (i = 0; i < 4; i = i + 1) begin
+
+            idx = pointer + i;
+
+            if (idx >= 4)
+                idx = idx - 4;
+
+            if (!found && req[idx]) begin
+                grant[idx] = 1'b1;
+
+                // Next search starts after granted requester
+                if (idx == 3)
+                    pointer <= 2'd0;
+                else
+                    pointer <= idx + 1;
+
+                found = 1'b1;
+            end
+        end
+    end
+end
+
+endmodule
